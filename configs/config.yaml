@@ -1,0 +1,48 @@
+# Code Documentation Generator Configuration
+
+# Anthropic API settings
+api:
+  provider: "anthropic"
+  model: "claude-sonnet-4-20250514"
+  max_tokens: 4096
+  temperature: 0.2
+  rate_limit_rpm: 50
+  retry_max_attempts: 3
+  retry_base_delay: 1.0
+
+# Parser settings
+parser:
+  python:
+    enabled: true
+    extensions: [".py"]
+    exclude_patterns: ["__pycache__", ".venv", "venv", "node_modules", ".git"]
+  javascript:
+    enabled: true
+    extensions: [".js", ".jsx", ".ts", ".tsx"]
+    exclude_patterns: ["node_modules", "dist", "build", ".git"]
+
+# Complexity analysis
+complexity:
+  enabled: true
+  thresholds:
+    low: 5
+    medium: 10
+    high: 20
+
+# Output settings
+output:
+  default_format: "markdown"
+  output_dir: "docs/generated"
+  include_source_links: true
+  include_complexity: true
+
+# Logging settings
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: null
+
+# Incremental mode
+incremental:
+  state_file: ".codedoc-state.json"
+  use_git_diff: true
