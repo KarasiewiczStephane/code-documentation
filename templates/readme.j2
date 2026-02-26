@@ -1,0 +1,41 @@
+Generate a comprehensive README.md for the following project.
+
+Project name: {{ project_name }}
+{% if description %}
+Description: {{ description }}
+{% endif %}
+
+{% if modules %}
+Project modules ({{ modules | length }}):
+{% for mod in modules %}
+- {{ mod.file_path }}{% if mod.docstring %}: {{ mod.docstring | truncate(100) }}{% endif %}
+  Functions: {{ mod.functions | length }}, Classes: {{ mod.classes | length }}
+{% endfor %}
+{% endif %}
+
+{% if entry_points %}
+Entry points: {{ entry_points | join(", ") }}
+{% endif %}
+
+{% if dependencies %}
+Dependencies:
+{% for dep in dependencies %}
+- {{ dep }}
+{% endfor %}
+{% endif %}
+
+{% if structure %}
+Project structure:
+```
+{{ structure }}
+```
+{% endif %}
+
+Requirements:
+- Include these sections: Overview, Installation, Usage, API Reference, Architecture, License
+- Make the Overview concise but informative
+- Include realistic usage examples with code blocks
+- API Reference should list the main modules and their key functions/classes
+- Architecture should briefly describe the project layout
+- Use Markdown format
+- Keep a professional tone

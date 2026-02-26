@@ -1,0 +1,34 @@
+Generate a Google-style Python docstring for the following {{ "async " if function.is_async else "" }}function.
+
+Function name: {{ function.name }}
+{% if function.parameters %}
+Parameters:
+{% for param in function.parameters %}
+- {{ param.name }}{% if param.type_hint %}: {{ param.type_hint }}{% endif %}{% if param.default_value %} = {{ param.default_value }}{% endif %}{% if param.is_args %} (*args){% endif %}{% if param.is_kwargs %} (**kwargs){% endif %}
+{% endfor %}
+{% endif %}
+{% if function.return_type %}
+Return type: {{ function.return_type }}
+{% endif %}
+{% if function.decorators %}
+Decorators: {{ function.decorators | join(", ") }}
+{% endif %}
+{% if function.source %}
+Source code:
+```
+{{ function.source }}
+```
+{% endif %}
+{% if context %}
+Additional context:
+{{ context }}
+{% endif %}
+
+Requirements:
+- Use Google-style docstring format
+- Include a concise one-line summary
+- Document all parameters with types in the Args section
+- Document the return value in the Returns section
+- If the function can raise exceptions, include a Raises section
+- Do NOT include the triple quotes — just the docstring content
+- Be concise but accurate

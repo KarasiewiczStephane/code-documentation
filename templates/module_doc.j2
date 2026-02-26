@@ -1,0 +1,36 @@
+Generate module-level documentation for the following Python module.
+
+File: {{ module.file_path }}
+{% if module.docstring %}
+Existing module docstring: {{ module.docstring }}
+{% endif %}
+
+{% if module.functions %}
+Functions ({{ module.functions | length }}):
+{% for func in module.functions %}
+- {{ func.name }}({{ func.parameters | map(attribute='name') | join(', ') }}){% if func.return_type %} -> {{ func.return_type }}{% endif %}{% if func.docstring %}: {{ func.docstring | truncate(80) }}{% endif %}
+{% endfor %}
+{% endif %}
+
+{% if module.classes %}
+Classes ({{ module.classes | length }}):
+{% for cls in module.classes %}
+- {{ cls.name }}{% if cls.base_classes %}({{ cls.base_classes | join(', ') }}){% endif %}{% if cls.docstring %}: {{ cls.docstring | truncate(80) }}{% endif %}
+  Methods: {{ cls.methods | map(attribute='name') | join(', ') }}
+{% endfor %}
+{% endif %}
+
+{% if module.imports %}
+Dependencies:
+{% for imp in module.imports %}
+- {% if imp.is_from_import %}from {{ imp.module }} import {{ imp.names | join(', ') }}{% else %}import {{ imp.module }}{% endif %}
+{% endfor %}
+{% endif %}
+
+Line count: {{ module.line_count }}
+
+Requirements:
+- Write a clear module overview explaining purpose and responsibilities
+- Summarize the key functions and classes
+- Note any important dependencies
+- Output in Markdown format with appropriate headers

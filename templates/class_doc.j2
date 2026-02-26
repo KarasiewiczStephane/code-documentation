@@ -1,0 +1,35 @@
+Generate comprehensive documentation for the following class.
+
+Class name: {{ class_info.name }}
+{% if class_info.base_classes %}
+Base classes: {{ class_info.base_classes | join(", ") }}
+{% endif %}
+{% if class_info.decorators %}
+Decorators: {{ class_info.decorators | join(", ") }}
+{% endif %}
+{% if class_info.docstring %}
+Existing docstring: {{ class_info.docstring }}
+{% endif %}
+{% if class_info.methods %}
+Methods:
+{% for method in class_info.methods %}
+- {{ method.name }}({{ method.parameters | map(attribute='name') | join(', ') }}){% if method.return_type %} -> {{ method.return_type }}{% endif %}{% if method.docstring %}: {{ method.docstring | truncate(80) }}{% endif %}
+{% endfor %}
+{% endif %}
+{% if class_info.source %}
+Source code:
+```
+{{ class_info.source }}
+```
+{% endif %}
+{% if context %}
+Additional context:
+{{ context }}
+{% endif %}
+
+Requirements:
+- Provide a clear overview of what this class does
+- Explain the class's role in the codebase
+- Document key attributes
+- Include a brief usage example if possible
+- Output in Markdown format
