@@ -1,56 +1,269 @@
-# code-documentation
+# Code Documentation Generator
 
-> Part of my Data Science Portfolio — [Skaraz Data](https://github.com/YOUR_USERNAME)
+An LLM-powered tool that generates comprehensive documentation from Python and JavaScript/TypeScript source code. Parses code structures, analyzes complexity, and produces Markdown or MkDocs-compatible HTML documentation.
 
-## Overview
+## Features
 
-TODO: Add project description
+- **Multi-language parsing** — Python (via AST) and JavaScript/TypeScript (via tree-sitter)
+- **Docstring generation** — Generates Google-style docstrings using the Claude API
+- **Docstring injection** — Inserts generated docstrings directly into source files with dry-run preview
+- **Complexity analysis** — Cyclomatic complexity scoring with Radon
+- **Call graph analysis** — Extracts function call relationships across modules
+- **Dependency visualization** — Generates Mermaid diagrams for import and call graphs
+- **Multiple output formats** — Markdown files or MkDocs-compatible HTML sites
+- **Incremental mode** — Only re-processes files changed since the last run
+- **Project-local config** — `.codedoc.yaml` overrides per project directory
+- **Cost estimation** — Estimate API costs before running full generation
 
-## Architecture
-
-TODO: Add architecture diagram
-
-## Setup
+## Installation
 
 ```bash
-# Clone
-git clone git@github.com:YOUR_USERNAME/code-documentation.git
+git clone git@github.com:KarasiewiczStephane/code-documentation.git
 cd code-documentation
-
-# Install
 pip install -r requirements.txt
-
-# Run
-make run
 ```
 
-## Usage
+### Docker
 
-TODO: Add usage examples
+```bash
+docker build -t code-doc-gen .
+docker run -v $(pwd)/target:/data code-doc-gen generate /data
+```
+
+## Quick Start
+
+```bash
+# Generate Markdown documentation for a project
+python -m src.cli.commands generate ./my-project --format md
+
+# Generate MkDocs-compatible HTML docs
+python -m src.cli.commands generate ./my-project --format html
+
+# Dry run to see what would be processed
+python -m src.cli.commands generate ./my-project --dry-run
+
+# Generate missing docstrings
+python -m src.cli.commands docstrings ./my-project
+
+# Estimate API cost before running
+python -m src.cli.commands estimate ./my-project
+```
+
+## CLI Reference
+
+### `generate`
+
+Generate full documentation for a codebase.
+
+```bash
+python -m src.cli.commands generate PATH [OPTIONS]
+```
+
+| Option | Description |
+|---|---|
+| `--format md\|html` | Output format (default: `md`) |
+| `--output-dir PATH` | Output directory |
+| `--dry-run` | Preview without API calls |
+| `--incremental, -i` | Only process changed files |
+| `--config PATH` | Path to configuration file |
+
+### `docstrings`
+
+Generate missing docstrings for Python files.
+
+```bash
+python -m src.cli.commands docstrings PATH [OPTIONS]
+```
+
+| Option | Description |
+|---|---|
+| `--dry-run` | Show which files need docstrings |
+| `--incremental, -i` | Only process changed files |
+
+### `readme`
+
+Generate a README.md for a project.
+
+```bash
+python -m src.cli.commands readme PATH [OPTIONS]
+```
+
+| Option | Description |
+|---|---|
+| `--output, -o PATH` | Output file path |
+
+### `complexity`
+
+Generate a complexity report for Python files.
+
+```bash
+python -m src.cli.commands complexity PATH
+```
+
+### `estimate`
+
+Estimate API cost without generating documentation.
+
+```bash
+python -m src.cli.commands estimate PATH
+```
+
+## Configuration
+
+### Global Configuration
+
+Settings are defined in `configs/config.yaml`:
+
+```yaml
+api:
+  provider: "anthropic"
+  model: "claude-sonnet-4-20250514"
+  max_tokens: 4096
+  temperature: 0.2
+  rate_limit_rpm: 50
+
+parser:
+  python:
+    enabled: true
+    extensions: [".py"]
+    exclude_patterns: ["__pycache__", ".venv", "node_modules"]
+  javascript:
+    enabled: true
+    extensions: [".js", ".jsx", ".ts", ".tsx"]
+
+complexity:
+  thresholds:
+    low: 5
+    medium: 10
+    high: 20
+
+output:
+  default_format: "markdown"
+  output_dir: "docs/generated"
+
+logging:
+  level: "INFO"
+
+incremental:
+  state_file: ".codedoc-state.json"
+  use_git_diff: true
+```
+
+### Project-Local Configuration
+
+Create a `.codedoc.yaml` file in your project root to override defaults:
+
+```yaml
+output:
+  default_format: html
+  output_dir: docs/api
+
+api:
+  max_tokens: 8192
+
+logging:
+  level: DEBUG
+```
+
+The tool searches for `.codedoc.yaml` (or `.codedoc.yml`) in the target directory and parent directories.
+
+### Environment Variables
+
+| Variable | Description |
+|---|---|
+| `ANTHROPIC_API_KEY` | Required for LLM-powered features |
 
 ## Project Structure
 
 ```
 code-documentation/
+├── configs/
+│   └── config.yaml          # Global configuration
 ├── src/
-│   ├── data/          # Data loading and preprocessing
-│   ├── models/        # Model training and inference
-│   ├── api/           # API endpoints
-│   └── utils/         # Helper functions
-├── tests/             # Unit and integration tests
-├── notebooks/         # Exploratory analysis
-├── configs/           # Configuration files
-├── docs/              # Documentation
-├── data/              # Sample data
+│   ├── analysis/
+│   │   ├── call_graph.py     # Function call graph extraction
+│   │   ├── complexity.py     # Cyclomatic complexity analysis
+│   │   └── graph_viz.py      # Mermaid diagram generation
+│   ├── cli/
+│   │   ├── commands.py       # Click CLI commands
+│   │   └── progress.py       # Progress reporting utilities
+│   ├── generators/
+│   │   ├── docstring_gen.py  # Docstring generation pipeline
+│   │   ├── llm_client.py     # Claude API client with retries
+│   │   ├── module_gen.py     # Module documentation generator
+│   │   ├── readme_gen.py     # README generation (multi-language)
+│   │   └── template_manager.py # Jinja2 prompt templates
+│   ├── output/
+│   │   ├── html.py           # MkDocs-compatible output
+│   │   ├── injector.py       # Docstring injection into source
+│   │   └── markdown.py       # Markdown output generation
+│   ├── parsers/
+│   │   ├── js_parser.py      # JavaScript/TypeScript parser
+│   │   ├── python_parser.py  # Python AST parser
+│   │   └── structure.py      # Shared data models
+│   └── utils/
+│       ├── config.py         # Configuration loader
+│       ├── git_utils.py      # Git integration for incremental mode
+│       └── logging.py        # Structured logging setup
+├── templates/                # Jinja2 prompt templates
+├── tests/                    # Unit and integration tests
 ├── Dockerfile
 ├── Makefile
 ├── requirements.txt
-└── README.md
+└── pyproject.toml
 ```
 
-## Results
+## Architecture
 
-TODO: Add metrics and results
+```
+Source Files ──► Parsers (AST/tree-sitter)
+                    │
+                    ▼
+              Data Models (ModuleInfo, FunctionInfo, ClassInfo)
+                    │
+           ┌────────┼────────┐
+           ▼        ▼        ▼
+      Complexity  Call Graph  Dependency Graph
+      Analysis    Analysis    Visualization
+           │        │             │
+           └────────┼─────────────┘
+                    ▼
+              Generators (LLM-powered)
+                    │
+           ┌────────┼────────┐
+           ▼        ▼        ▼
+        Markdown   HTML    Injector
+        Output    (MkDocs)  (in-place)
+```
+
+## Development
+
+```bash
+# Install dependencies
+make install
+
+# Run tests
+make test
+
+# Lint and format
+make lint
+
+# Run all pre-commit hooks
+pre-commit run --all-files
+```
+
+## Testing
+
+```bash
+# Full test suite with coverage
+pytest tests/ -v --cov=src --cov-report=term-missing
+
+# Run a specific test file
+pytest tests/test_module_gen.py -v
+
+# Run integration tests only
+pytest tests/test_integration.py -v
+```
 
 ## License
 
