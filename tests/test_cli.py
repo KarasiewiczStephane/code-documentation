@@ -123,6 +123,88 @@ class TestDocstringsCommand:
         assert "without docstrings" in result.output
 
 
+class TestIncrementalMode:
+    """Tests for the incremental mode flag."""
+
+    def test_generate_incremental_help(self, runner: CliRunner) -> None:
+        result = runner.invoke(doc, ["generate", "--help"])
+        assert "--incremental" in result.output
+
+    def test_docstrings_incremental_help(self, runner: CliRunner) -> None:
+        result = runner.invoke(doc, ["docstrings", "--help"])
+        assert "--incremental" in result.output
+
+    def test_generate_incremental_dry_run(
+        self, runner: CliRunner, sample_project: Path
+    ) -> None:
+        result = runner.invoke(
+            doc,
+            ["generate", str(sample_project), "--incremental", "--dry-run"],
+        )
+        assert result.exit_code == 0
+        assert "Incremental mode" in result.output
+
+    def test_docstrings_incremental_dry_run(
+        self, runner: CliRunner, sample_project: Path
+    ) -> None:
+        result = runner.invoke(
+            doc,
+            ["docstrings", str(sample_project), "--incremental", "--dry-run"],
+        )
+        assert result.exit_code == 0
+        assert "Incremental mode" in result.output
+
+    def test_generate_incremental_creates_state(
+        self, runner: CliRunner, sample_project: Path
+    ) -> None:
+        result = runner.invoke(
+            doc,
+            [
+                "generate",
+                str(sample_project),
+                "--incremental",
+                "--format",
+                "md",
+                "--output-dir",
+                str(sample_project / "docs"),
+            ],
+        )
+        assert result.exit_code == 0
+        state_file = sample_project / ".codedoc-state.json"
+        assert state_file.exists()
+
+    def test_incremental_second_run_skips(
+        self, runner: CliRunner, sample_project: Path
+    ) -> None:
+        """Test that a second incremental run processes fewer files."""
+        # First run
+        runner.invoke(
+            doc,
+            [
+                "generate",
+                str(sample_project),
+                "--incremental",
+                "--format",
+                "md",
+                "--output-dir",
+                str(sample_project / "docs"),
+            ],
+        )
+
+        # Second run without modifications
+        result = runner.invoke(
+            doc,
+            [
+                "generate",
+                str(sample_project),
+                "--incremental",
+                "--dry-run",
+            ],
+        )
+        assert result.exit_code == 0
+        assert "0 changed files" in result.output
+
+
 class TestComplexityCommand:
     """Tests for the 'complexity' command."""
 

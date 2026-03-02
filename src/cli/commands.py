@@ -21,6 +21,12 @@ from src.parsers.js_parser import JSParser
 from src.parsers.python_parser import PythonParser
 from src.parsers.structure import Language
 from src.utils.config import load_config
+from src.utils.git_utils import (
+    filter_changed_files,
+    load_state,
+    save_state,
+    update_state_hashes,
+)
 from src.utils.logging import setup_logging
 
 logger = logging.getLogger(__name__)
@@ -97,8 +103,18 @@ def doc() -> None:
     is_flag=True,
     help="Show what would be generated without calling the API.",
 )
+@click.option(
+    "--incremental",
+    "-i",
+    is_flag=True,
+    help="Only process files changed since the last run.",
+)
 def generate(
-    path: str, output_format: str, output_dir: Optional[str], dry_run: bool
+    path: str,
+    output_format: str,
+    output_dir: Optional[str],
+    dry_run: bool,
+    incremental: bool,
 ) -> None:
     """Generate full documentation for a codebase.
 
@@ -108,6 +124,16 @@ def generate(
     config = load_config()
     files = _collect_files(path)
     click.echo(f"Found {len(files)} source files")
+
+    # Apply incremental filtering
+    state = None
+    if incremental:
+        state_path = str(Path(path) / config.incremental.state_file)
+        state = load_state(state_path)
+        all_str_paths = [str(f) for f in files]
+        changed = filter_changed_files(all_str_paths, state, repo_path=path)
+        files = [Path(f) for f in changed]
+        click.echo(f"Incremental mode: {len(files)} changed files to process")
 
     if dry_run:
         for f in files:
@@ -142,6 +168,13 @@ def generate(
         writer.write_index(modules)
         click.echo(f"Markdown documentation written to {out_dir}")
 
+    # Update incremental state
+    if incremental and state is not None:
+        update_state_hashes(state, [str(f) for f in files], repo_path=path)
+        state_path = str(Path(path) / config.incremental.state_file)
+        save_state(state, state_path)
+        click.echo("Incremental state updated.")
+
 
 @doc.command()
 @click.argument("path", type=click.Path(exists=True))
@@ -174,7 +207,13 @@ def readme(path: str, output: Optional[str]) -> None:
 @doc.command()
 @click.argument("path", type=click.Path(exists=True))
 @click.option("--dry-run", is_flag=True, help="Show which files need docstrings.")
-def docstrings(path: str, dry_run: bool) -> None:
+@click.option(
+    "--incremental",
+    "-i",
+    is_flag=True,
+    help="Only process files changed since the last run.",
+)
+def docstrings(path: str, dry_run: bool, incremental: bool) -> None:
     """Generate missing docstrings for Python source files.
 
     Scans for functions and classes without docstrings and
@@ -183,6 +222,16 @@ def docstrings(path: str, dry_run: bool) -> None:
     config = load_config()
     files = [f for f in _collect_files(path) if f.suffix == ".py"]
     click.echo(f"Found {len(files)} Python files")
+
+    # Apply incremental filtering
+    state = None
+    if incremental:
+        state_path = str(Path(path) / config.incremental.state_file)
+        state = load_state(state_path)
+        all_str_paths = [str(f) for f in files]
+        changed = filter_changed_files(all_str_paths, state, repo_path=path)
+        files = [Path(f) for f in changed]
+        click.echo(f"Incremental mode: {len(files)} changed files to process")
 
     parser = PythonParser()
     modules = []
@@ -220,6 +269,13 @@ def docstrings(path: str, dry_run: bool) -> None:
             f"  {module.file_path}: {len(result.function_docs)} functions, "
             f"{len(result.class_docs)} classes"
         )
+
+    # Update incremental state
+    if incremental and state is not None:
+        update_state_hashes(state, [str(f) for f in files], repo_path=path)
+        state_path = str(Path(path) / config.incremental.state_file)
+        save_state(state, state_path)
+        click.echo("Incremental state updated.")
 
     click.echo("Docstring generation complete.")
 
