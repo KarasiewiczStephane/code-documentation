@@ -109,19 +109,27 @@ def doc() -> None:
     is_flag=True,
     help="Only process files changed since the last run.",
 )
+@click.option(
+    "--config",
+    "config_file",
+    type=click.Path(),
+    default=None,
+    help="Path to configuration file.",
+)
 def generate(
     path: str,
     output_format: str,
     output_dir: Optional[str],
     dry_run: bool,
     incremental: bool,
+    config_file: Optional[str],
 ) -> None:
     """Generate full documentation for a codebase.
 
     Parses all source files, generates docstrings and module docs
     via the LLM, and writes output in the specified format.
     """
-    config = load_config()
+    config = load_config(config_path=config_file, project_path=path)
     files = _collect_files(path)
     click.echo(f"Found {len(files)} source files")
 

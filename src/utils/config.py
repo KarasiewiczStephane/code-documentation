@@ -127,7 +127,60 @@ def _build_parser_config(data: dict) -> ParserConfig:
     )
 
 
-def load_config(config_path: Optional[str] = None) -> AppConfig:
+def find_project_config(start_path: str) -> Optional[Path]:
+    """Search for .codedoc.yaml in start_path and parent directories.
+
+    Traverses from start_path upward to find a project-local
+    configuration file.
+
+    Args:
+        start_path: Directory to start searching from.
+
+    Returns:
+        Path to the found config file, or None if not found.
+    """
+    path = Path(start_path).resolve()
+    if path.is_file():
+        path = path.parent
+
+    for directory in [path, *path.parents]:
+        config_file = directory / ".codedoc.yaml"
+        if config_file.exists():
+            logger.info("Found project config: %s", config_file)
+            return config_file
+        config_file = directory / ".codedoc.yml"
+        if config_file.exists():
+            logger.info("Found project config: %s", config_file)
+            return config_file
+    return None
+
+
+def _merge_dicts(base: dict, override: dict) -> dict:
+    """Deep merge override dict into base dict.
+
+    Values in override take precedence. Nested dicts are merged
+    recursively; non-dict values are replaced.
+
+    Args:
+        base: Base dictionary with default values.
+        override: Dictionary with override values.
+
+    Returns:
+        Merged dictionary.
+    """
+    merged = base.copy()
+    for key, value in override.items():
+        if key in merged and isinstance(merged[key], dict) and isinstance(value, dict):
+            merged[key] = _merge_dicts(merged[key], value)
+        else:
+            merged[key] = value
+    return merged
+
+
+def load_config(
+    config_path: Optional[str] = None,
+    project_path: Optional[str] = None,
+) -> AppConfig:
     """Load application configuration from a YAML file.
 
     Reads the YAML config file and constructs a fully typed AppConfig
@@ -135,9 +188,14 @@ def load_config(config_path: Optional[str] = None) -> AppConfig:
     is read from the ANTHROPIC_API_KEY environment variable, not from
     the config file.
 
+    If project_path is provided, searches for a .codedoc.yaml file
+    in that directory and its parents, merging it with the base config.
+
     Args:
         config_path: Path to the YAML config file. If None, uses the
             default path at configs/config.yaml.
+        project_path: Optional project directory to search for
+            .codedoc.yaml overrides.
 
     Returns:
         A fully populated AppConfig instance.
@@ -154,6 +212,15 @@ def load_config(config_path: Optional[str] = None) -> AppConfig:
 
     with open(path) as f:
         raw = yaml.safe_load(f) or {}
+
+    # Merge project-local config if found
+    if project_path:
+        local_config = find_project_config(project_path)
+        if local_config:
+            with open(local_config) as f:
+                local_raw = yaml.safe_load(f) or {}
+            raw = _merge_dicts(raw, local_raw)
+            logger.info("Merged project config from %s", local_config)
 
     logger.info("Loaded configuration from %s", path)
 
