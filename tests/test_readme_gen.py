@@ -175,3 +175,81 @@ class TestGenerateReadme:
         generator.llm.generate.assert_called_once()
         call_args = generator.llm.generate.call_args
         assert "test" in call_args[0][0]  # prompt contains project name
+
+
+class TestMultiLanguageSupport:
+    """Tests for multi-language project analysis."""
+
+    def test_detects_python_language(
+        self, generator: ReadmeGenerator, tmp_path: Path
+    ) -> None:
+        (tmp_path / "app.py").write_text("def main(): pass\n")
+
+        info = generator.analyze_project(str(tmp_path))
+        assert "Python" in info.languages
+
+    def test_detects_js_language(
+        self, generator: ReadmeGenerator, tmp_path: Path
+    ) -> None:
+        (tmp_path / "app.js").write_text("function main() {}\n")
+
+        info = generator.analyze_project(str(tmp_path))
+        assert "JavaScript/TypeScript" in info.languages
+
+    def test_detects_mixed_languages(
+        self, generator: ReadmeGenerator, tmp_path: Path
+    ) -> None:
+        (tmp_path / "app.py").write_text("def main(): pass\n")
+        (tmp_path / "index.js").write_text("function main() {}\n")
+
+        info = generator.analyze_project(str(tmp_path))
+        assert "Python" in info.languages
+        assert "JavaScript/TypeScript" in info.languages
+        assert len(info.modules) >= 2
+
+    def test_package_json_dependencies(
+        self, generator: ReadmeGenerator, tmp_path: Path
+    ) -> None:
+        import json
+
+        pkg = {
+            "name": "test-project",
+            "dependencies": {"express": "^4.18.0", "lodash": "^4.17.0"},
+            "devDependencies": {"jest": "^29.0.0"},
+        }
+        (tmp_path / "package.json").write_text(json.dumps(pkg))
+
+        info = generator.analyze_project(str(tmp_path))
+        assert len(info.js_dependencies) == 3
+        assert any("express" in d for d in info.js_dependencies)
+        assert any("jest" in d for d in info.js_dependencies)
+
+    def test_no_package_json(self, generator: ReadmeGenerator, tmp_path: Path) -> None:
+        info = generator.analyze_project(str(tmp_path))
+        assert info.js_dependencies == []
+
+    def test_invalid_package_json(
+        self, generator: ReadmeGenerator, tmp_path: Path
+    ) -> None:
+        (tmp_path / "package.json").write_text("not valid json{{{")
+
+        info = generator.analyze_project(str(tmp_path))
+        assert info.js_dependencies == []
+
+    def test_skips_node_modules(
+        self, generator: ReadmeGenerator, tmp_path: Path
+    ) -> None:
+        nm = tmp_path / "node_modules" / "some-lib"
+        nm.mkdir(parents=True)
+        (nm / "index.js").write_text("module.exports = {}\n")
+        (tmp_path / "app.js").write_text("const lib = require('./lib');\n")
+
+        info = generator.analyze_project(str(tmp_path))
+        paths = [m.file_path for m in info.modules]
+        assert not any("node_modules" in p for p in paths)
+
+    def test_ts_tsx_files(self, generator: ReadmeGenerator, tmp_path: Path) -> None:
+        (tmp_path / "app.ts").write_text("function hello(): string { return 'hi'; }\n")
+
+        info = generator.analyze_project(str(tmp_path))
+        assert len(info.modules) >= 1

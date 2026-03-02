@@ -1,9 +1,11 @@
 """README generation for projects using LLM analysis.
 
 Analyzes a full codebase directory, gathers project metadata, and
-generates a comprehensive README.md via the LLM client.
+generates a comprehensive README.md via the LLM client. Supports
+mixed Python and JavaScript/TypeScript projects.
 """
 
+import json
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -11,6 +13,7 @@ from typing import Optional
 
 from src.generators.llm_client import LLMClient
 from src.generators.template_manager import TemplateManager
+from src.parsers.js_parser import JSParser
 from src.parsers.python_parser import PythonParser
 from src.parsers.structure import ModuleInfo
 from src.utils.config import AppConfig, load_config
@@ -45,6 +48,8 @@ class ProjectInfo:
     modules: list[ModuleInfo] = field(default_factory=list)
     entry_points: list[str] = field(default_factory=list)
     dependencies: list[str] = field(default_factory=list)
+    js_dependencies: list[str] = field(default_factory=list)
+    languages: list[str] = field(default_factory=list)
     structure: str = ""
 
 
@@ -71,7 +76,8 @@ class ReadmeGenerator:
         self.llm = llm_client
         self.templates = template_manager or TemplateManager()
         self.config = config or load_config()
-        self._parser = PythonParser()
+        self._py_parser = PythonParser()
+        self._js_parser = JSParser()
 
     def analyze_project(self, project_path: str) -> ProjectInfo:
         """Analyze a project directory and gather metadata.
@@ -96,10 +102,23 @@ class ReadmeGenerator:
         logger.info("Analyzing project: %s at %s", name, root)
 
         # Parse Python files
-        modules = self._scan_python_files(root)
+        py_modules = self._scan_python_files(root)
+
+        # Parse JavaScript/TypeScript files
+        js_modules = self._scan_js_files(root)
+
+        modules = py_modules + js_modules
+
+        # Detect languages
+        languages = []
+        if py_modules:
+            languages.append("Python")
+        if js_modules:
+            languages.append("JavaScript/TypeScript")
 
         # Read dependencies
         dependencies = self._read_dependencies(root)
+        js_dependencies = self._read_package_json_deps(root)
 
         # Find entry points
         entry_points = self._find_entry_points(root)
@@ -113,6 +132,8 @@ class ReadmeGenerator:
             modules=modules,
             entry_points=entry_points,
             dependencies=dependencies,
+            js_dependencies=js_dependencies,
+            languages=languages,
             structure=structure,
         )
 
@@ -155,12 +176,11 @@ class ReadmeGenerator:
         exclude = set(self.config.parser.python.exclude_patterns)
 
         for py_file in sorted(root.rglob("*.py")):
-            # Skip excluded directories
             if any(part in exclude for part in py_file.parts):
                 continue
             try:
                 relative = str(py_file.relative_to(root))
-                module = self._parser.parse_file(str(py_file))
+                module = self._py_parser.parse_file(str(py_file))
                 module.file_path = relative
                 modules.append(module)
             except (SyntaxError, UnicodeDecodeError) as e:
@@ -168,6 +188,63 @@ class ReadmeGenerator:
 
         logger.info("Parsed %d Python files", len(modules))
         return modules
+
+    def _scan_js_files(self, root: Path) -> list[ModuleInfo]:
+        """Scan and parse all JavaScript/TypeScript files in the project.
+
+        Args:
+            root: Project root directory.
+
+        Returns:
+            List of parsed ModuleInfo objects.
+        """
+        modules = []
+        exclude = set(self.config.parser.javascript.exclude_patterns)
+        js_extensions = {".js", ".jsx", ".ts", ".tsx"}
+
+        for js_file in sorted(root.rglob("*")):
+            if js_file.suffix not in js_extensions:
+                continue
+            if any(part in exclude for part in js_file.parts):
+                continue
+            try:
+                relative = str(js_file.relative_to(root))
+                module = self._js_parser.parse_file(str(js_file))
+                module.file_path = relative
+                modules.append(module)
+            except (SyntaxError, UnicodeDecodeError, Exception) as e:
+                logger.warning("Skipping %s: %s", js_file, e)
+
+        logger.info("Parsed %d JavaScript/TypeScript files", len(modules))
+        return modules
+
+    def _read_package_json_deps(self, root: Path) -> list[str]:
+        """Read dependencies from package.json if it exists.
+
+        Args:
+            root: Project root directory.
+
+        Returns:
+            List of npm dependency strings.
+        """
+        pkg_file = root / "package.json"
+        if not pkg_file.exists():
+            return []
+
+        try:
+            data = json.loads(pkg_file.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, UnicodeDecodeError) as e:
+            logger.warning("Cannot parse package.json: %s", e)
+            return []
+
+        deps = []
+        for section in ("dependencies", "devDependencies"):
+            section_deps = data.get(section, {})
+            for name, version in section_deps.items():
+                deps.append(f"{name}@{version}")
+
+        logger.info("Found %d npm dependencies", len(deps))
+        return deps
 
     def _read_dependencies(self, root: Path) -> list[str]:
         """Read project dependencies from requirements.txt.
