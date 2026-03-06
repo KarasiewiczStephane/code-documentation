@@ -14,14 +14,47 @@ An LLM-powered tool that generates comprehensive documentation from Python and J
 - **Incremental mode** — Only re-processes files changed since the last run
 - **Project-local config** — `.codedoc.yaml` overrides per project directory
 - **Cost estimation** — Estimate API costs before running full generation
+- **Analytics dashboard** — Streamlit dashboard with complexity metrics, coverage tracking, and cost estimation
 
-## Installation
+## Quick Start
 
-```bash
-git clone git@github.com:KarasiewiczStephane/code-documentation.git
-cd code-documentation
-pip install -r requirements.txt
-```
+1. **Install dependencies**
+
+   ```bash
+   git clone git@github.com:KarasiewiczStephane/code-documentation.git
+   cd code-documentation
+   make install
+   ```
+
+2. **Set your API key** (required for LLM-powered features)
+
+   ```bash
+   export ANTHROPIC_API_KEY="your-key-here"
+   ```
+
+   Or create a `.env` file in the project root:
+
+   ```
+   ANTHROPIC_API_KEY=your-key-here
+   ```
+
+3. **Run the CLI** against any Python or JavaScript/TypeScript project
+
+   ```bash
+   # Generate Markdown documentation
+   python -m src.main generate ./my-project --format md
+
+   # Dry run to preview what would be processed (no API calls)
+   python -m src.main generate ./my-project --dry-run
+   ```
+
+4. **Launch the dashboard** (uses synthetic data, no API key needed)
+
+   ```bash
+   make dashboard
+   ```
+
+   This starts a Streamlit app displaying complexity metrics, documentation coverage, and LLM cost estimation charts.
 
 ### Docker
 
@@ -30,33 +63,16 @@ docker build -t code-doc-gen .
 docker run -v $(pwd)/target:/data code-doc-gen generate /data
 ```
 
-## Quick Start
-
-```bash
-# Generate Markdown documentation for a project
-python -m src.cli.commands generate ./my-project --format md
-
-# Generate MkDocs-compatible HTML docs
-python -m src.cli.commands generate ./my-project --format html
-
-# Dry run to see what would be processed
-python -m src.cli.commands generate ./my-project --dry-run
-
-# Generate missing docstrings
-python -m src.cli.commands docstrings ./my-project
-
-# Estimate API cost before running
-python -m src.cli.commands estimate ./my-project
-```
-
 ## CLI Reference
+
+The CLI is invoked via `python -m src.main` (or `make run`), which delegates to the Click command group.
 
 ### `generate`
 
 Generate full documentation for a codebase.
 
 ```bash
-python -m src.cli.commands generate PATH [OPTIONS]
+python -m src.main generate PATH [OPTIONS]
 ```
 
 | Option | Description |
@@ -72,7 +88,7 @@ python -m src.cli.commands generate PATH [OPTIONS]
 Generate missing docstrings for Python files.
 
 ```bash
-python -m src.cli.commands docstrings PATH [OPTIONS]
+python -m src.main docstrings PATH [OPTIONS]
 ```
 
 | Option | Description |
@@ -85,7 +101,7 @@ python -m src.cli.commands docstrings PATH [OPTIONS]
 Generate a README.md for a project.
 
 ```bash
-python -m src.cli.commands readme PATH [OPTIONS]
+python -m src.main readme PATH [OPTIONS]
 ```
 
 | Option | Description |
@@ -97,7 +113,7 @@ python -m src.cli.commands readme PATH [OPTIONS]
 Generate a complexity report for Python files.
 
 ```bash
-python -m src.cli.commands complexity PATH
+python -m src.main complexity PATH
 ```
 
 ### `estimate`
@@ -105,7 +121,7 @@ python -m src.cli.commands complexity PATH
 Estimate API cost without generating documentation.
 
 ```bash
-python -m src.cli.commands estimate PATH
+python -m src.main estimate PATH
 ```
 
 ## Configuration
@@ -180,6 +196,7 @@ code-documentation/
 ├── configs/
 │   └── config.yaml          # Global configuration
 ├── src/
+│   ├── main.py              # Entry point (delegates to CLI)
 │   ├── analysis/
 │   │   ├── call_graph.py     # Function call graph extraction
 │   │   ├── complexity.py     # Cyclomatic complexity analysis
@@ -187,6 +204,8 @@ code-documentation/
 │   ├── cli/
 │   │   ├── commands.py       # Click CLI commands
 │   │   └── progress.py       # Progress reporting utilities
+│   ├── dashboard/
+│   │   └── app.py            # Streamlit analytics dashboard
 │   ├── generators/
 │   │   ├── docstring_gen.py  # Docstring generation pipeline
 │   │   ├── llm_client.py     # Claude API client with retries
@@ -247,6 +266,9 @@ make test
 
 # Lint and format
 make lint
+
+# Launch the analytics dashboard
+make dashboard
 
 # Run all pre-commit hooks
 pre-commit run --all-files
